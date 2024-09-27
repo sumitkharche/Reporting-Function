@@ -1,0 +1,87 @@
+<policies>
+    <inbound>
+        <base />
+        <set-variable name="reportType" value="@(context.Request.Url.Query.GetValueOrDefault("report_type"))" />
+        <set-variable name="sasToken" value="@{
+                        string resourceUri = "https://abc-sbns-qa.servicebus.windows.net/fff-ecomm-reporting-sbq-qa";
+                        string keyName = "RootManageSharedAccessKey";
+                        string key = "{{ServiceBusAccessKey}}";
+                        TimeSpan sinceEpoch = DateTime.UtcNow - new DateTime(1970, 1, 1);
+                        var expiry = Convert.ToString((int)sinceEpoch.TotalSeconds + 30);
+                        string stringToSign = System.Uri.EscapeDataString(resourceUri) + "\n" + expiry;
+                        HMACSHA256 hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
+                        var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
+                        var sasToken = String.Format("SharedAccessSignature sig={1}&amp;se={2}&amp;skn={3}&amp;sr={0}", 
+                                        System.Uri.EscapeDataString(resourceUri),
+                                        System.Uri.EscapeDataString(signature), expiry, keyName);
+                        return sasToken;
+                    }" />
+        <set-header name="Authorization" exists-action="override">
+            <value>@(context.Variables.GetValueOrDefault<string>("sasToken"))</value>
+        </set-header>
+        <set-backend-service base-url="https://abc-sbns-qa.servicebus.windows.net/" />
+        <rewrite-uri template="abc-ecomm-reporting-sbq-qa/messages" />
+        <set-header name="Content-type" exists-action="override">
+            <value>application/json</value>
+        </set-header>
+        <set-header name="BrokerProperties" exists-action="override">
+            <value>@{
+                    var json = new JObject();
+                    json.Add("MessageId", context.RequestId);
+                    return json.ToString(Newtonsoft.Json.Formatting.None);
+                }</value>
+        </set-header>
+        <set-header name="CustomProperties" exists-action="override">
+            <value>@{
+                    var json = new JObject();
+                    return json.ToString(Newtonsoft.Json.Formatting.None);
+                }</value>
+        </set-header>
+        <set-body>@{
+                JObject json = context.Request.Body.As<JObject>(preserveContent: true);
+                json.Add("reportType",context.Variables.GetValueOrDefault<string>("reportType"));                
+                return JsonConvert.SerializeObject(json);
+            }</set-body>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+        <choose>
+            <when condition="@(context.Response.StatusCode == 201)">
+                <set-header name="Content-type" exists-action="override">
+                    <value>application/json</value>
+                </set-header>
+                <set-status code="201" />
+                <set-body>@{
+                    JObject customResponse = new JObject();
+                    customResponse.Add("messageCode", "I001");
+                    customResponse.Add("messageDescription", "Email will be sent shortly");
+                    customResponse.Add("reportType", context.Request.Body.As<JObject>()["reportType"]);
+                    JObject results = new JObject();
+                    results.Add("results", customResponse);
+                    return results.ToString();
+                }</set-body>
+            </when>
+            <otherwise>
+                <set-header name="Content-type" exists-action="override">
+                    <value>application/json</value>
+                </set-header>
+                <set-status code="500" reason="Internal Server Error" />
+                <set-body>@{
+                    JObject errorResponse = new JObject();
+                    errorResponse.Add("messageCode", "E001");
+                    errorResponse.Add("messageDescription", "Failed to send Email.");
+                    errorResponse.Add("reportType", context.Request.Body.As<JObject>()["reportType"]);
+                    JObject errors = new JObject();
+                    errors.Add("errors", errorResponse);
+                    return errors.ToString();
+                }</set-body>
+            </otherwise>
+        </choose>
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>
