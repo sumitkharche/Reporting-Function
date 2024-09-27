@@ -1,0 +1,251 @@
+# This workflow will build a C# based Azure Function and deploy it to an Azure Functions App on Windows.
+#
+# This workflow assumes you have already created the target Azure Functions app.
+
+name: Deploy Azure Function App
+
+on:
+  workflow_dispatch:  # This is for the manual trigger 
+   inputs:
+    env:
+      type: choice
+      description: 'Select the target Environment'
+      required: true
+      options:
+      - DEV
+      - QA
+      - PROD
+    performanceTesting:
+      description: 'Run Performance Tests:'
+      required: false
+      default: 'false'
+      type: choice
+      options:
+        - 'true'
+        - 'false'
+    runSpecific:
+      description: 'Select "all" to run all tests or "specific" to run chosen tests.'
+      required: false
+      type: choice
+      default: 'all'
+      options: 
+        - 'all'
+        - 'specific'
+    specificTestCases:
+      description: 'Enter test case IDs separated by commas (e.g., 1,2,3) if "specific" is selected above.'
+      required: false        
+
+env:
+  AZURE_FUNCTIONAPP_NAME_DEV: 'fff-ecomm-reporting-func-dev'   # set this to your DEV function app name on Azure
+  AZURE_FUNCTIONAPP_NAME_QA: 'fff-ecomm-reporting-func-qa'   # set this to your QA function app name on Azure
+  AZURE_FUNCTIONAPP_NAME_PROD: 'fff-ecomm-reporting-func-prod'   # set this to your PROD function app name on Azure
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'FFF-Reporting-AzureFunction'       # set this to the path to your function app project, defaults to the repository root
+  DOTNET_VERSION: '8.0.x'                   # set this to the dotnet version to use (e.g. '2.1.x', '3.1.x', '5.0.x')
+  BLAZEMETER_API_KEY: ${{ secrets.BLAZEMETER_API_KEY }}    # replace the key with API Key created. This is temporary
+  BLAZEMETER_API_SECRET: ${{ secrets.BLAZEMETER_API_SECRET }} # replace the secret with API secret createtd. This is temporary
+  BLAZEMETER_CONTINUEPIPELINE: 'false'
+  BLAZEMETER_SHOWTAILLOG: 'true'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # For Linux, use ubuntu-latest
+    environment: DEV
+    if: ${{ github.event.inputs.performanceTesting == 'false'}}
+    steps:
+    # Checkout the repo
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+  
+    # Setup .NET Core SDK
+    - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    # Run dotnet build to build the function code 
+    - name: 'Resolve Project Dependencies Using Dotnet'
+      shell: bash # For Linux, use bash
+      run: |
+        pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+        dotnet build --configuration Release --property:OutputPath=./output
+        popd
+        
+    # Publish artifact    
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4.3.1
+      with:
+        name: function-app
+        path: ./FFF-Reporting-AzureFunction/output
+
+  deploy-to-dev:
+   runs-on: ubuntu-latest # For Linux, use ubuntu-latest
+   environment: DEV
+   needs: build   
+   if: ${{ inputs.env == 'DEV' && github.event.inputs.performanceTesting == 'false'}}
+   steps:
+    - name: Send notification to Microsoft Teams (Start)
+      run: |
+        cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+        echo "Current Time CST= $cst_current_time"      
+        curl -X POST -H "Content-Type: application/json" --data '{
+        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>DEV</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
+
+    # Download published artifact
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v4.1.4
+      with:
+        name: function-app
+
+    # Deploy function code to Azure Function App on Azure Cloud    
+    - name: 'Run Azure Functions Action'
+      uses: Azure/functions-action@v1
+      id: fa
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME_DEV }}
+        package: '.'
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+    - name: Send notification to Microsoft Teams (Complete)
+      if: ${{ success() }}
+      run: |
+          cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+          echo "Current Time CST= $cst_current_time"      
+          curl -X POST -H "Content-Type: application/json" --data '{
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>DEV</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
+    - name: Send notification to Microsoft Teams (Failed)
+      if: ${{ failure() }}
+      run: |
+          cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+          echo "Current Time CST= $cst_current_time"          
+          curl -X POST -H "Content-Type: application/json" --data '{
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>DEV</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
+
+  deploy-to-qa:
+   runs-on: ubuntu-latest # For Linux, use ubuntu-latest
+   environment: QA
+   needs: build
+   if: ${{ (github.ref == 'refs/heads/release' || startsWith(github.ref, 'refs/heads/release')) && inputs.env == 'QA' && github.event.inputs.performanceTesting == 'false' }}
+   steps:
+    - name: Send notification to Microsoft Teams (Start)
+      run: |
+        cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+        echo "Current Time CST= $cst_current_time"      
+        curl -X POST -H "Content-Type: application/json" --data '{
+        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>QA</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
+  # Download published artifact
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v4.1.4
+      with:
+        name: function-app
+
+    # Deploy function code to Azure Function App on Azure Cloud    
+    - name: 'Run Azure Functions Action'
+      uses: Azure/functions-action@v1
+      id: fa
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME_QA }}
+        package: '.'
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}        
+    - name: Send notification to Microsoft Teams (Complete)
+      if: ${{ success() }}
+      run: |
+          cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+          echo "Current Time CST= $cst_current_time"      
+          curl -X POST -H "Content-Type: application/json" --data '{
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>QA</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
+    - name: Send notification to Microsoft Teams (Failed)
+      if: ${{ failure() }}
+      run: |
+          cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+          echo "Current Time CST= $cst_current_time"          
+          curl -X POST -H "Content-Type: application/json" --data '{
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>QA</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
+
+  deploy-to-prod:
+   runs-on: ubuntu-latest # For Linux, use ubuntu-latest
+   environment: PROD
+   needs: build
+   if: ${{ (github.ref == 'refs/heads/release' || startsWith(github.ref, 'refs/heads/release')) && inputs.env == 'PROD' && github.event.inputs.performanceTesting == 'false'}}
+   steps:
+    - name: Send notification to Microsoft Teams (Start)
+      run: |
+        cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+        echo "Current Time CST= $cst_current_time"      
+        curl -X POST -H "Content-Type: application/json" --data '{
+        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>PROD</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
+
+    # Download published artifact
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v4.1.4
+      with:
+        name: function-app
+    
+    # Deploy function code to Azure Function App on Azure Cloud
+    - name: 'Run Azure Functions Action'
+      uses: Azure/functions-action@v1
+      id: fa
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME_PROD }}
+        package: '.'
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+    - name: Send notification to Microsoft Teams (Complete)
+      if: ${{ success() }}
+      run: |
+          cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+          echo "Current Time CST= $cst_current_time"      
+          curl -X POST -H "Content-Type: application/json" --data '{
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>PROD</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
+    - name: Send notification to Microsoft Teams (Failed)
+      if: ${{ failure() }}
+      run: |
+          cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
+          echo "Current Time CST= $cst_current_time"          
+          curl -X POST -H "Content-Type: application/json" --data '{
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>PROD</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
+
+
+  SETUP_TESTCASES_CONFIGURATION:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.performanceTesting == 'true'}}
+    name: Setup TestCases Configuration
+    outputs:
+      testIDs: ${{ steps.set_test_ids.outputs.testIDs }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v2.3.4
+
+      - name: 'Determine Test IDs'
+        id: set_test_ids
+        run: |
+          if [ "${{ github.event.inputs.runSpecific }}" = "specific" ]; then
+            test_case_string="${{ github.event.inputs.specificTestCases }}"
+            # Replace commas with JSON array format
+            json_array=$(echo "$test_case_string" | sed 's/,/,/g' | sed 's/^/[ /; s/$/ ]/' | sed 's/ //g')
+            echo "Formatted JSON array: $json_array" # Debugging output
+            echo "testIDs=$json_array" >> "$GITHUB_OUTPUT"
+          else
+            # Extract IDs from the JSON file using jq
+            ids=$(jq -r '[.performanceTests[].id | tonumber] | join(",")' PerformanceTests.json)
+            # Set the output for the job
+            echo "testIDs=[$ids]" >> "$GITHUB_OUTPUT"
+          fi        
+  RUN_PERFORMANCE_TESTING:
+    name: EXECUTE BLAZEMETER PERFORMANCE TESTING
+    runs-on: ubuntu-latest
+    if: ${{github.event_name == 'workflow_dispatch' && github.event.inputs.performanceTesting == 'true'}}
+    needs: SETUP_TESTCASES_CONFIGURATION
+    strategy:
+      max-parallel: 1 # This will make to sure to run test cases in sequential manner i.e. one at time
+      matrix:
+        testID: ${{fromJson(needs.SETUP_TESTCASES_CONFIGURATION.outputs.testIDs)}}
+    steps:
+      # Checkout
+      - name: 'Checkout'
+        uses: actions/checkout@v2.3.4
+      - name: Run Blazemeter test for ${{matrix.testID}}
+        uses: Blazemeter/github-action@v8.4
+        with:
+          apiKey: ${{env.BLAZEMETER_API_KEY}} 
+          apiSecret: ${{env.BLAZEMETER_API_SECRET}} 
+          testID: ${{ matrix.testID}}
+          continuePipeline: ${{env.BLAZEMETER_CONTINUEPIPELINE}} 
+          showTailLog: ${{env.BLAZEMETER_SHOWTAILLOG}}
