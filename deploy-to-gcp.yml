@@ -1,0 +1,185 @@
+name: Deploy to Google Cloud Run
+
+on:
+    workflow_dispatch:  # This is for the manual trigger
+     inputs:
+       env:
+         type: choice
+         description: 'Select the target Environment'
+         required: true
+         options:
+         - DEV
+         - STAGE
+         - PROD
+
+env:
+    GCP_REGION: 'us-west1' # region name
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    environment: DEV
+    if: ${{ inputs.env == 'DEV'}}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.2.1
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x ms.payment/gradlew
+        
+      - name: Build with Gradle
+        run: cd ms.payment && ./gradlew build --console=plain
+
+      - name: Log in to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+  
+      - name: Configure gcloud
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true        
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+    
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: docker build --build-arg="ENV_VAR=dev" -t gcr.io/test-pay-dev/ecomm-payment-ms-dev:latest ms.payment/
+
+      - name: Push Docker image
+        run: docker push gcr.io/test-pay-dev/ecomm-payment-ms-dev:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ecomm-payment-ms-dev \
+            --image gcr.io/test-pay-dev/ecomm-payment-ms-dev:latest \
+            --platform managed \
+            --region ${{ env.GCP_REGION }} \
+            --allow-unauthenticated \
+            --vpc-egress=all-traffic \
+            --vpc-connector projects/test-cloud-router/locations/us-west1/connectors/vpc-con-ecomm-dev
+
+  deploy-stage:
+    runs-on: ubuntu-latest
+    environment: STAGE
+    if: ${{ (github.ref == 'refs/heads/release' || startsWith(github.ref, 'refs/heads/release')) && inputs.env == 'STAGE' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.2.1
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x ms.payment/gradlew
+        
+      - name: Build with Gradle
+        run: cd ms.payment && ./gradlew build --console=plain
+
+      - name: Log in to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+  
+      - name: Configure gcloud
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true        
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+    
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: docker build --build-arg="ENV_VAR=stage" -t gcr.io/test-pay-stage/ecomm-payment-ms-stage:latest ms.payment/
+
+      - name: Push Docker image
+        run: docker push gcr.io/test-pay-stage/ecomm-payment-ms-stage:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ecomm-payment-ms-stage \
+            --image gcr.io/test-pay-stage/ecomm-payment-ms-stage:latest \
+            --platform managed \
+            --region ${{ env.GCP_REGION }} \
+            --allow-unauthenticated \
+            --vpc-egress=all-traffic \
+            --vpc-connector projects/test-cloud-router/locations/us-west1/connectors/vpc-con-ecomm-stage
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    environment: PROD
+    if: ${{ (github.ref == 'refs/heads/release' || startsWith(github.ref, 'refs/heads/release')) && inputs.env == 'PROD' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.2.1
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x ms.payment/gradlew
+        
+      - name: Build with Gradle
+        run: cd ms.payment && ./gradlew build --console=plain
+
+      - name: Log in to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+  
+      - name: Configure gcloud
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true        
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+    
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: docker build --build-arg="ENV_VAR=prod" -t gcr.io/tets-pay-prod/ecomm-payment-ms-prod:latest ms.payment/
+
+      - name: Push Docker image
+        run: docker push gcr.io/test-pay-prod/ecomm-payment-ms-prod:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ecomm-payment-ms-prod \
+            --image gcr.io/test-pay-prod/ecomm-payment-ms-prod:latest \
+            --platform managed \
+            --region ${{ env.GCP_REGION }} \
+            --allow-unauthenticated \
+            --vpc-egress=all-traffic \
+            --vpc-connector projects/test-cloud-router/locations/us-west1/connectors/vpc-con-ecomm-prod
