@@ -36,10 +36,10 @@ on:
       required: false        
 
 env:
-  AZURE_FUNCTIONAPP_NAME_DEV: 'fff-ecomm-reporting-func-dev'   # set this to your DEV function app name on Azure
-  AZURE_FUNCTIONAPP_NAME_QA: 'fff-ecomm-reporting-func-qa'   # set this to your QA function app name on Azure
-  AZURE_FUNCTIONAPP_NAME_PROD: 'fff-ecomm-reporting-func-prod'   # set this to your PROD function app name on Azure
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'FFF-Reporting-AzureFunction'       # set this to the path to your function app project, defaults to the repository root
+  AZURE_FUNCTIONAPP_NAME_DEV: 'reporting-func-dev'   # set this to your DEV function app name on Azure
+  AZURE_FUNCTIONAPP_NAME_QA: 'reporting-func-qa'   # set this to your QA function app name on Azure
+  AZURE_FUNCTIONAPP_NAME_PROD: 'reporting-func-prod'   # set this to your PROD function app name on Azure
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'Reporting-AzureFunction'       # set this to the path to your function app project, defaults to the repository root
   DOTNET_VERSION: '8.0.x'                   # set this to the dotnet version to use (e.g. '2.1.x', '3.1.x', '5.0.x')
   BLAZEMETER_API_KEY: ${{ secrets.BLAZEMETER_API_KEY }}    # replace the key with API Key created. This is temporary
   BLAZEMETER_API_SECRET: ${{ secrets.BLAZEMETER_API_SECRET }} # replace the secret with API secret createtd. This is temporary
@@ -88,7 +88,7 @@ jobs:
         cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
         echo "Current Time CST= $cst_current_time"      
         curl -X POST -H "Content-Type: application/json" --data '{
-        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>DEV</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
+        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>DEV</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link:https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
 
     # Download published artifact
     - name: Download a Build Artifact
@@ -110,14 +110,14 @@ jobs:
           cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
           echo "Current Time CST= $cst_current_time"      
           curl -X POST -H "Content-Type: application/json" --data '{
-          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>DEV</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>DEV</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
     - name: Send notification to Microsoft Teams (Failed)
       if: ${{ failure() }}
       run: |
           cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
           echo "Current Time CST= $cst_current_time"          
           curl -X POST -H "Content-Type: application/json" --data '{
-          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>DEV</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>DEV</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link:https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
 
   deploy-to-qa:
    runs-on: ubuntu-latest # For Linux, use ubuntu-latest
@@ -130,7 +130,7 @@ jobs:
         cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
         echo "Current Time CST= $cst_current_time"      
         curl -X POST -H "Content-Type: application/json" --data '{
-        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>QA</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
+        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>QA</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
   # Download published artifact
     - name: Download a Build Artifact
       uses: actions/download-artifact@v4.1.4
@@ -151,14 +151,14 @@ jobs:
           cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
           echo "Current Time CST= $cst_current_time"      
           curl -X POST -H "Content-Type: application/json" --data '{
-          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>QA</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>QA</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link:https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
     - name: Send notification to Microsoft Teams (Failed)
       if: ${{ failure() }}
       run: |
           cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
           echo "Current Time CST= $cst_current_time"          
           curl -X POST -H "Content-Type: application/json" --data '{
-          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>QA</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>QA</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
 
   deploy-to-prod:
    runs-on: ubuntu-latest # For Linux, use ubuntu-latest
@@ -171,7 +171,7 @@ jobs:
         cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
         echo "Current Time CST= $cst_current_time"      
         curl -X POST -H "Content-Type: application/json" --data '{
-        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>PROD</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
+        "text": " <b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>STARTED</b> <br> ENV: <b>PROD</b> <br> Started At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}    
 
     # Download published artifact
     - name: Download a Build Artifact
@@ -193,14 +193,14 @@ jobs:
           cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
           echo "Current Time CST= $cst_current_time"      
           curl -X POST -H "Content-Type: application/json" --data '{
-          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>PROD</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>COMPLETED</b> <br> ENV: <b>PROD</b><br> Completed At: <b>'"$cst_current_time"'</b> <br><br> Pipeline Link:https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}        
     - name: Send notification to Microsoft Teams (Failed)
       if: ${{ failure() }}
       run: |
           cst_current_time=$(TZ="America/Chicago" date +"%Y-%m-%d %H:%M:%S CST")
           echo "Current Time CST= $cst_current_time"          
           curl -X POST -H "Content-Type: application/json" --data '{
-          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>PROD</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/FFFEnterprises/fff-azure-functions/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
+          "text": "<b>E-PubSub</b> <br><br>Triggered By: <b>${{github.actor}}</b><br>Status: Deployment <b>FAILED</b> <br> ENV: <b>PROD</b> <br> Failed At: <b>'"$cst_current_time"'</b><br><br> Pipeline Link: https://github.com/sumitkharche/Reporting-Function/actions/runs/'${{github.run_id}}'"}' ${{ secrets.ENV_RELEASES_TEAMS_WEBHOOK_URL }}                    
 
 
   SETUP_TESTCASES_CONFIGURATION:
